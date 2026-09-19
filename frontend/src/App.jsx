@@ -16,12 +16,15 @@ import Footer from './components/Footer';
 import SystemStatusModal from './components/SystemStatusModal';
 import InteractiveTerminal from './components/InteractiveTerminal';
 import AdminDashboard from './components/AdminDashboard';
+import TronMusicPlayer from './components/TronMusicPlayer';
 import { api } from './services/api';
 import { sound } from './services/soundService';
 
 export default function App() {
   const [bootComplete, setBootComplete] = useState(false);
-  const [soundMuted, setSoundMuted] = useState(true);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(() => {
+    return localStorage.getItem('tron_audio_enabled') === 'true';
+  });
 
   // Modals
   const [isHealthOpen, setIsHealthOpen] = useState(false);
@@ -73,11 +76,6 @@ export default function App() {
     fetchAllData();
   }, [fetchAllData]);
 
-  const toggleSound = () => {
-    const isNowMuted = sound.toggleMute();
-    setSoundMuted(isNowMuted);
-  };
-
   return (
     <div className="relative min-h-screen bg-tron-void text-tron-text overflow-x-hidden">
       
@@ -87,19 +85,21 @@ export default function App() {
       {/* Subtle CRT Scanline overlay effect */}
       <div className="scanlines" aria-hidden="true" />
 
-      {/* Cinematic Boot Screen (first load) */}
+      {/* Cinematic Boot Screen (first load with audio enablement prompt) */}
       {!bootComplete && (
-        <BootScreen onComplete={() => setBootComplete(true)} />
+        <BootScreen
+          onComplete={() => setBootComplete(true)}
+          onEnableAudio={() => setIsAudioEnabled(true)}
+        />
       )}
 
-      {/* Top Navigation HUD */}
+      {/* 100% Full-Width Top Navigation HUD with Futuristic Burger Menu */}
       <Navbar
         systemStatus={systemStatus}
         onOpenHealth={() => setIsHealthOpen(true)}
         onOpenTerminal={() => setIsTerminalOpen(true)}
         onOpenAdmin={() => setIsAdminOpen(true)}
-        soundMuted={soundMuted}
-        onToggleSound={toggleSound}
+        onToggleAudioPlayer={() => setIsAudioEnabled(prev => !prev)}
       />
 
       {/* Main Content Sections */}
@@ -155,6 +155,12 @@ export default function App() {
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}
         onDataUpdated={fetchAllData}
+      />
+
+      {/* TRON: Legacy "End of Line" Music Player Module */}
+      <TronMusicPlayer
+        isAudioEnabled={isAudioEnabled}
+        onEnableAudio={() => setIsAudioEnabled(true)}
       />
 
     </div>

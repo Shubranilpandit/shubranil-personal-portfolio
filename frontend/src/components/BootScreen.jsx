@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Volume2, VolumeX, Sparkles } from 'lucide-react';
 import { sound } from '../services/soundService';
 
 const BOOT_LOGS = [
@@ -12,10 +13,12 @@ const BOOT_LOGS = [
   "SYSTEM ONLINE // WELCOME TO THE GRID",
 ];
 
-export default function BootScreen({ onComplete }) {
+export default function BootScreen({ onComplete, onEnableAudio }) {
   const [progress, setProgress] = useState(0);
   const [logIndex, setLogIndex] = useState(0);
   const [isFading, setIsFading] = useState(false);
+  const [bootReady, setBootReady] = useState(false);
+  const [audioPromptStatus, setAudioPromptStatus] = useState('AUDIO MODULE READY');
 
   useEffect(() => {
     sound.playBootSequence();
@@ -24,19 +27,16 @@ export default function BootScreen({ onComplete }) {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
-          setTimeout(() => {
-            setIsFading(true);
-            setTimeout(onComplete, 400);
-          }, 300);
+          setBootReady(true);
           return 100;
         }
-        const next = prev + Math.floor(Math.random() * 8) + 4;
+        const next = prev + Math.floor(Math.random() * 8) + 5;
         return Math.min(next, 100);
       });
-    }, 110);
+    }, 100);
 
     return () => clearInterval(interval);
-  }, [onComplete]);
+  }, []);
 
   useEffect(() => {
     const logIdx = Math.min(
@@ -46,6 +46,23 @@ export default function BootScreen({ onComplete }) {
     setLogIndex(logIdx);
   }, [progress]);
 
+  const handleEnableAudio = () => {
+    sound.playClick();
+    setAudioPromptStatus("AUDIO LINK ESTABLISHED");
+    if (onEnableAudio) onEnableAudio();
+
+    setTimeout(() => {
+      setIsFading(true);
+      setTimeout(onComplete, 350);
+    }, 500);
+  };
+
+  const handleEnterSilently = () => {
+    sound.playClick();
+    setIsFading(true);
+    setTimeout(onComplete, 250);
+  };
+
   const handleSkip = () => {
     sound.playClick();
     setIsFading(true);
@@ -54,9 +71,11 @@ export default function BootScreen({ onComplete }) {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-tron-void px-4 transition-opacity duration-500 ${
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-tron-void px-4 transition-opacity duration-500 select-none ${
         isFading ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
+      role="dialog"
+      aria-label="System Boot Sequence"
     >
       {/* Background radial grid glow */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,240,255,0.08)_0%,transparent_70%)] pointer-events-none" />
@@ -75,7 +94,7 @@ export default function BootScreen({ onComplete }) {
       </div>
 
       {/* Futuristic Boot Content */}
-      <div className="w-full max-w-md bg-tron-panel/90 border border-tron-border p-6 shadow-cyan-glow relative backdrop-blur-md clip-chamfer">
+      <div className="w-full max-w-md bg-tron-panel/95 border border-tron-border p-6 shadow-cyan-glow relative backdrop-blur-md clip-chamfer">
         <div className="hud-corner hud-corner-tl" />
         <div className="hud-corner hud-corner-tr" />
         <div className="hud-corner hud-corner-bl" />
@@ -83,7 +102,9 @@ export default function BootScreen({ onComplete }) {
 
         <div className="flex items-center justify-between text-xs font-mono text-tron-muted mb-3 border-b border-tron-border/60 pb-2">
           <span className="text-tron-cyan font-bold tracking-wider">BOOT PROTOCOL v2.5.0</span>
-          <span className="text-tron-green">STATUS: BOOTING</span>
+          <span className={bootReady ? "text-tron-green font-bold" : "text-tron-amber"}>
+            STATUS: {bootReady ? "ONLINE" : "BOOTING"}
+          </span>
         </div>
 
         {/* Terminal Log Streams */}
@@ -104,7 +125,7 @@ export default function BootScreen({ onComplete }) {
         </div>
 
         {/* Cyber Progress Bar */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 mb-4">
           <div className="flex justify-between text-xs font-mono text-tron-muted">
             <span>CORE LOAD SEQUENCE</span>
             <span className="text-tron-cyan font-bold">{progress}%</span>
@@ -117,16 +138,50 @@ export default function BootScreen({ onComplete }) {
           </div>
         </div>
 
-        {/* Skip Sequence CTA */}
-        <div className="mt-5 pt-3 border-t border-tron-border/40 flex justify-between items-center text-xs">
-          <span className="text-slate-500 font-mono text-[11px]">INITIALIZING IDENTITY MATRIX</span>
-          <button
-            onClick={handleSkip}
-            className="text-tron-cyan/80 hover:text-tron-cyan hover:underline font-mono text-xs tracking-wider transition-colors"
-          >
-            [SKIP BOOT]
-          </button>
-        </div>
+        {/* ============================================================ */}
+        {/* BOOT COMPLETE: AUDIO MODULE PROMPT (NO AUTOPLAY)              */}
+        {/* ============================================================ */}
+        {bootReady ? (
+          <div className="mt-4 pt-4 border-t border-tron-border space-y-3 animate-fadeIn">
+            <div className="text-center font-mono space-y-1">
+              <div className="text-xs font-bold text-tron-green">
+                SYSTEM ONLINE
+              </div>
+              <div className="text-[11px] text-tron-cyan font-semibold">
+                {audioPromptStatus}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-xs">
+              <button
+                onClick={handleEnableAudio}
+                className="py-2 px-3 rounded bg-tron-cyan/20 border border-tron-cyan text-tron-cyan hover:bg-tron-cyan hover:text-black font-bold flex items-center justify-center gap-1.5 transition-all shadow-cyan-glow-sm"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>ENABLE AUDIO</span>
+              </button>
+
+              <button
+                onClick={handleEnterSilently}
+                className="py-2 px-3 rounded bg-slate-900 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 font-semibold flex items-center justify-center gap-1.5 transition-all"
+              >
+                <VolumeX className="w-3.5 h-3.5" />
+                <span>ENTER SILENTLY</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Skip Sequence CTA while booting */
+          <div className="mt-4 pt-3 border-t border-tron-border/40 flex justify-between items-center text-xs">
+            <span className="text-slate-500 font-mono text-[11px]">INITIALIZING IDENTITY MATRIX</span>
+            <button
+              onClick={handleSkip}
+              className="text-tron-cyan/80 hover:text-tron-cyan hover:underline font-mono text-xs tracking-wider transition-colors"
+            >
+              [SKIP BOOT]
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
