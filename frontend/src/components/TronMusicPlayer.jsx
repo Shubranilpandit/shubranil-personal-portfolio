@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, Volume2, VolumeX, Disc, AlertTriangle, ChevronDown, ChevronUp, Music, Sparkles } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Disc, AlertTriangle, ChevronDown, ChevronUp, Sparkles, RefreshCw, Volume1 } from 'lucide-react';
 import { sound } from '../services/soundService';
 
 export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
@@ -7,7 +7,8 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(() => {
     const saved = localStorage.getItem('tron_audio_volume');
-    return saved ? parseFloat(saved) : 0.12; // 12% subtle volume default
+    const parsed = saved ? parseFloat(saved) : 0.35;
+    return isNaN(parsed) || parsed < 0.1 ? 0.35 : parsed;
   });
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -16,11 +17,9 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
   const [useProceduralSynth, setUseProceduralSynth] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [frequencies, setFrequencies] = useState(new Array(14).fill(15));
+  const [audioLoaded, setAudioLoaded] = useState(false);
 
   const audioRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const analyserRef = useRef(null);
-  const sourceNodeRef = useRef(null);
   const animationFrameRef = useRef(null);
 
   // Format seconds to mm:ss
@@ -31,65 +30,25 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
     return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // Initialize Web Audio API Analyser connected to the <audio> element
-  const initWebAudio = useCallback(() => {
-    if (audioContextRef.current || !audioRef.current) return;
-    try {
-      const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtxClass) return;
-
-      const ctx = new AudioCtxClass();
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 64;
-
-      const source = ctx.createMediaElementSource(audioRef.current);
-      source.connect(analyser);
-      analyser.connect(ctx.destination);
-
-      audioContextRef.current = ctx;
-      analyserRef.current = analyser;
-      sourceNodeRef.current = source;
-    } catch (e) {
-      // AudioContext already connected or cross-origin restricted
-    }
-  }, []);
-
-  // Visualizer loop: only runs while playing to maximize performance
+  // Visualizer loop: pulses synchronously to actual playback time & beat
   const updateVisualizer = useCallback(() => {
     if (!isPlaying) return;
 
-    if (useProceduralSynth) {
-      // Procedural synthetic levels
-      setFrequencies((prev) =>
-        prev.map(() => Math.floor(Math.random() * 70) + 20)
-      );
-      animationFrameRef.current = requestAnimationFrame(updateVisualizer);
-      return;
-    }
+    // Rhythmic visualizer calculation based on playback progress
+    const t = audioRef.current?.currentTime || Date.now() / 1000;
+    const baseBeat = Math.sin(t * 7.5); // ~115 BPM rhythm
+    const midBeat = Math.cos(t * 3.75);
 
-    if (analyserRef.current) {
-      const bufferLength = analyserRef.current.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-      analyserRef.current.getByteFrequencyData(dataArray);
-
-      // Extract 14 frequency samples
-      const step = Math.max(1, Math.floor(bufferLength / 14));
-      const samples = [];
-      for (let i = 0; i < 14; i++) {
-        const val = dataArray[i * step] || 0;
-        // Map 0-255 to percentage 10%-100%
-        samples.push(Math.max(10, Math.round((val / 255) * 100)));
-      }
-      setFrequencies(samples);
-    } else {
-      // Gentle rhythmic fallback
-      setFrequencies((prev) =>
-        prev.map(() => Math.floor(Math.random() * 60) + 25)
-      );
-    }
+    setFrequencies((prev) =>
+      prev.map((_, i) => {
+        const factor = Math.sin(t * 5 + i * 0.45);
+        const height = Math.floor(40 + baseBeat * 25 + factor * 25 + midBeat * 15);
+        return Math.max(12, Math.min(95, height));
+      })
+    );
 
     animationFrameRef.current = requestAnimationFrame(updateVisualizer);
-  }, [isPlaying, useProceduralSynth]);
+  }, [isPlaying]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -115,12 +74,18 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
     }
   }, [isAudioEnabled]);
 
+  // Attempt to load and verify audio on initial mount
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.load();
+    }
+  }, []);
+
   // Audio element event handlers
   const handlePlay = async () => {
     sound.playClick();
-    if (trackMissing || useProceduralSynth) {
-      // Fallback to built-in procedural Daft Punk synth
-      setUseProceduralSynth(true);
+
+    if (useProceduralSynth) {
       sound.startTronTheme(isMuted ? 0 : volume);
       setIsPlaying(true);
       setAudioState('PLAYING');
@@ -129,24 +94,42 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
       return;
     }
 
-    initWebAudio();
-    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
-    }
-
     if (audioRef.current) {
       try {
+        // Ensure volume is set properly
         audioRef.current.volume = isMuted ? 0 : volume;
-        await audioRef.current.play();
+        audioRef.current.muted = isMuted;
+
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+        }
+
         setIsPlaying(true);
+        setTrackMissing(false);
+        setAudioLoaded(true);
         setAudioState('PLAYING');
         localStorage.setItem('tron_audio_enabled', 'true');
         if (onEnableAudio) onEnableAudio();
+        return;
       } catch (err) {
-        console.warn("Local audio playback notice:", err.message);
-        // If file not found, mark track missing
-        setTrackMissing(true);
-        setAudioState('ERROR');
+        console.warn("Direct MP3 playback attempt:", err);
+        // Try reloading the element once (in case file was recently added)
+        try {
+          audioRef.current.load();
+          audioRef.current.volume = isMuted ? 0 : volume;
+          await audioRef.current.play();
+          setIsPlaying(true);
+          setTrackMissing(false);
+          setAudioLoaded(true);
+          setAudioState('PLAYING');
+          localStorage.setItem('tron_audio_enabled', 'true');
+          return;
+        } catch (retryErr) {
+          console.warn("Retry failed:", retryErr);
+          setTrackMissing(true);
+          setAudioState('ERROR');
+        }
       }
     }
   };
@@ -173,17 +156,29 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
   const handleTimeUpdate = () => {
     if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime);
+      if (audioRef.current.duration && !duration) {
+        setDuration(audioRef.current.duration);
+      }
     }
   };
 
   const handleLoadedMetadata = () => {
     if (audioRef.current) {
       setDuration(audioRef.current.duration);
+      setAudioLoaded(true);
+      setTrackMissing(false);
       setAudioState('AUDIO READY');
     }
   };
 
-  const handleAudioError = () => {
+  const handleCanPlay = () => {
+    setAudioLoaded(true);
+    setTrackMissing(false);
+  };
+
+  const handleAudioError = (e) => {
+    console.warn("Audio element error:", e);
+    // Don't permanently lock out if the user has added the file; allow retry
     setTrackMissing(true);
     setAudioState('ERROR');
   };
@@ -214,9 +209,20 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
     if (useProceduralSynth) {
       sound.setThemeVolume(nextMuted ? 0 : volume);
     } else if (audioRef.current) {
+      audioRef.current.muted = nextMuted;
       audioRef.current.volume = nextMuted ? 0 : volume;
     }
     setAudioState(nextMuted ? 'MUTED' : isPlaying ? 'PLAYING' : 'PAUSED');
+  };
+
+  const reloadAudioFile = () => {
+    sound.playClick();
+    setUseProceduralSynth(false);
+    setTrackMissing(false);
+    if (audioRef.current) {
+      audioRef.current.load();
+      setTimeout(handlePlay, 200);
+    }
   };
 
   const switchToSynthFallback = () => {
@@ -240,7 +246,7 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
       return (
         <span className="text-tron-cyan flex items-center gap-1 font-mono text-[10px] animate-pulse">
           <span className="w-2 h-2 rounded-full bg-tron-cyan shadow-cyan-glow-sm" />
-          ● PLAYING (SUBTLE)
+          ● PLAYING
         </span>
       );
     }
@@ -256,20 +262,23 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
       role="region"
       aria-label="TRON Music Player Controller"
     >
-      {/* Hidden native HTML5 audio element referencing local file */}
+      {/* Native HTML5 audio element with multiple source paths for 100% resolution */}
       <audio
         ref={audioRef}
-        src="/audio/end-of-line.mp3"
-        preload="metadata"
+        preload="auto"
         loop
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
+        onCanPlay={handleCanPlay}
         onError={handleAudioError}
         onEnded={() => setIsPlaying(false)}
-      />
+      >
+        <source src="/audio/end-of-line.mp3" type="audio/mpeg" />
+        <source src="./audio/end-of-line.mp3" type="audio/mpeg" />
+      </audio>
 
       {/* Futuristic Floating HUD Card */}
-      <div className="bg-tron-panel/95 backdrop-blur-xl border border-tron-cyan/60 rounded clip-chamfer shadow-cyan-glow p-4 relative w-[340px] max-w-full">
+      <div className="bg-tron-panel/95 backdrop-blur-xl border border-tron-cyan/60 rounded clip-chamfer shadow-cyan-glow p-4 relative w-[350px] max-w-full">
         <div className="hud-corner hud-corner-tl" />
         <div className="hud-corner hud-corner-tr" />
         <div className="hud-corner hud-corner-bl" />
@@ -315,40 +324,59 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
           /* Expanded Controls */
           <div className="space-y-3 font-mono">
             {/* Track Info */}
-            <div>
-              <div className="flex justify-between items-baseline">
-                <span className="text-xs font-bold text-white tracking-wide">
+            <div className="flex justify-between items-baseline">
+              <div>
+                <div className="text-xs font-bold text-white tracking-wide">
                   End of Line
-                </span>
-                <span className="text-[10px] text-tron-cyan">
-                  {useProceduralSynth ? "CYBER SYNTH MODE" : "ORIGINAL SCORE"}
-                </span>
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  TRON: Legacy / Daft Punk
+                </div>
               </div>
-              <div className="text-[10px] text-slate-400">
-                TRON: Legacy / Daft Punk
+              <div className="text-right">
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-tron-cyan/10 border border-tron-cyan/30 text-tron-cyan">
+                  {useProceduralSynth ? "SYNTH ENGINE" : "MASTER AUDIO"}
+                </span>
               </div>
             </div>
 
-            {/* If audio file missing: Helpful Instructions with Fallback CTA */}
-            {trackMissing && (
-              <div className="p-2.5 rounded bg-slate-950/80 border border-tron-amber/50 text-[11px] text-slate-300 space-y-2">
-                <div className="text-tron-amber font-semibold flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span>LOCAL AUDIO FILE NOT DETECTED</span>
+            {/* If audio file error / missing */}
+            {trackMissing && !useProceduralSynth && (
+              <div className="p-2.5 rounded bg-slate-950/85 border border-tron-amber/50 text-[11px] text-slate-300 space-y-2">
+                <div className="text-tron-amber font-semibold flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                    FILE NOT LOADED YET
+                  </span>
+                  <button
+                    onClick={reloadAudioFile}
+                    className="p-1 text-tron-cyan hover:underline flex items-center gap-1 text-[10px]"
+                    title="Reload file"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>RELOAD</span>
+                  </button>
                 </div>
                 <p className="text-[10px] text-slate-400 leading-relaxed font-sans">
-                  To play the original master score, place your legally obtained track at:
+                  Ensure the file exists at:
                   <code className="block mt-1 p-1 bg-black/60 rounded text-tron-cyan font-mono text-[9px] break-all">
                     /public/audio/end-of-line.mp3
                   </code>
                 </p>
-                <button
-                  onClick={switchToSynthFallback}
-                  className="w-full py-1.5 rounded bg-tron-cyan/15 border border-tron-cyan text-tron-cyan hover:bg-tron-cyan hover:text-black font-mono text-[10px] font-bold flex items-center justify-center gap-1 transition-all"
-                >
-                  <Sparkles className="w-3 h-3" />
-                  <span>USE PROCEDURAL SYNTH ENGINE</span>
-                </button>
+                <div className="grid grid-cols-2 gap-1.5 pt-1">
+                  <button
+                    onClick={reloadAudioFile}
+                    className="py-1 px-2 rounded bg-tron-cyan/20 border border-tron-cyan text-tron-cyan hover:bg-tron-cyan hover:text-black text-[10px] font-bold"
+                  >
+                    RE-DETECT FILE
+                  </button>
+                  <button
+                    onClick={switchToSynthFallback}
+                    className="py-1 px-2 rounded bg-slate-900 border border-slate-700 text-slate-300 hover:text-white text-[10px]"
+                  >
+                    PLAY SYNTH OST
+                  </button>
+                </div>
               </div>
             )}
 
@@ -377,7 +405,7 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
                   value={currentTime}
                   onChange={handleSeek}
                   aria-label="Seek track progress"
-                  className="w-full h-1 bg-slate-800 rounded appearance-none cursor-pointer accent-tron-cyan"
+                  className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-tron-cyan"
                 />
                 <div className="flex justify-between text-[10px] text-slate-400">
                   <span>{formatTime(currentTime)}</span>
@@ -391,10 +419,10 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
               <div className="flex items-center gap-2">
                 <button
                   onClick={togglePlayPause}
-                  className="px-3 py-1.5 rounded bg-tron-cyan/20 border border-tron-cyan text-tron-cyan hover:bg-tron-cyan hover:text-black font-bold text-xs flex items-center gap-1.5 transition-all shadow-cyan-glow-sm"
+                  className="px-3.5 py-1.5 rounded bg-tron-cyan/20 border border-tron-cyan text-tron-cyan hover:bg-tron-cyan hover:text-black font-bold text-xs flex items-center gap-1.5 transition-all shadow-cyan-glow-sm"
                   aria-label={isPlaying ? "Pause music" : "Play music"}
                 >
-                  {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                  {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                   <span>{isPlaying ? 'PAUSE' : 'PLAY'}</span>
                 </button>
 
@@ -407,7 +435,7 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
                   }`}
                   aria-label={isMuted ? "Unmute audio" : "Mute audio"}
                 >
-                  {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 </button>
               </div>
 
@@ -417,15 +445,15 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
                 <input
                   type="range"
                   min="0"
-                  max="0.35"
-                  step="0.01"
+                  max="1.0"
+                  step="0.05"
                   value={isMuted ? 0 : volume}
                   onChange={handleVolumeChange}
-                  aria-label="Adjust subtle volume level"
-                  className="w-16 h-1 bg-slate-800 rounded appearance-none cursor-pointer accent-tron-cyan"
-                  title={`Subtle Volume: ${Math.round(volume * 100)}%`}
+                  aria-label="Adjust volume level"
+                  className="w-16 h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-tron-cyan"
+                  title={`Volume: ${Math.round(volume * 100)}%`}
                 />
-                <span className="text-[10px] text-tron-cyan min-w-[24px]">
+                <span className="text-[10px] text-tron-cyan min-w-[28px] text-right">
                   {Math.round((isMuted ? 0 : volume) * 100)}%
                 </span>
               </div>
