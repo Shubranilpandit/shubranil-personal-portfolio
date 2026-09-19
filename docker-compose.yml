@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: tron_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tron_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-TronSecurePass2026}
+      POSTGRES_DB: ${POSTGRES_DB:-shubranil_portfolio}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tron_user} -d ${POSTGRES_DB:-shubranil_portfolio}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: tron_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-tron_user}:${POSTGRES_PASSWORD:-TronSecurePass2026}@db:5432/${POSTGRES_DB:-shubranil_portfolio}
+      - SECRET_KEY=${SECRET_KEY:-tron-cyber-secret-key-shubranil-2026-mca}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-tron-jwt-secret-key-2026}
+      - GITHUB_USERNAME=${GITHUB_USERNAME:-shubranil-pandit}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - CORS_ORIGINS=*
+    ports:
+      - "5000:5000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: tron_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
