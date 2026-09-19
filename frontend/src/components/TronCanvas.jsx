@@ -1,8 +1,11 @@
 import React, { useEffect, useRef } from 'react';
+import { audioReactive } from '../services/audioReactiveService';
 
 /**
  * TRON Digital Grid & Particle Stream Canvas
  * Renders an animated Tron-inspired perspective grid and floating data particles.
+ * Dynamically pulses horizon neon glow and perspective line brightness in sync with audio beats.
+ * Immediately rests at nominal baseline when audio stops.
  */
 export default function TronCanvas() {
   const canvasRef = useRef(null);
@@ -21,6 +24,12 @@ export default function TronCanvas() {
       height = canvas.height = window.innerHeight;
     };
     window.addEventListener('resize', handleResize);
+
+    // Audio reactive beat telemetry state (direct reference, zero React re-render overhead)
+    let beatTelemetry = { intensity: 0, isPlaying: false, kick: 0 };
+    const unsubscribeBeat = audioReactive.subscribe((data) => {
+      beatTelemetry = data;
+    });
 
     // Particle nodes
     const particleCount = Math.min(50, Math.floor(width / 30));
@@ -50,12 +59,17 @@ export default function TronCanvas() {
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, width, height);
 
-      // Perspective horizon grid
-      gridOffset = (gridOffset + 0.3) % 40;
+      // Compute active beat intensity (0 when paused/stopped)
+      const beatIntensity = beatTelemetry.isPlaying ? beatTelemetry.intensity : 0;
+
+      // Perspective horizon grid with beat-accelerated velocity
+      gridOffset = (gridOffset + 0.3 + beatIntensity * 0.35) % 40;
       const horizonY = height * 0.7;
 
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.08)';
-      ctx.lineWidth = 1;
+      // Perspective grid lines surge with beat
+      const gridAlpha = 0.08 + beatIntensity * 0.16;
+      ctx.strokeStyle = `rgba(0, 240, 255, ${gridAlpha})`;
+      ctx.lineWidth = 1 + beatIntensity * 0.4;
 
       // Horizontal lines with perspective spacing
       for (let y = horizonY; y < height; y += (height - horizonY) / 14) {
@@ -76,11 +90,12 @@ export default function TronCanvas() {
         ctx.stroke();
       }
 
-      // Horizon neon glow line
-      ctx.shadowColor = '#00f0ff';
-      ctx.shadowBlur = 15;
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
-      ctx.lineWidth = 1.5;
+      // Horizon neon glow line with dynamic bloom on beat
+      const shadowBloom = 15 + beatIntensity * 32;
+      ctx.shadowColor = beatIntensity > 0.45 ? '#a5f3fc' : '#00f0ff';
+      ctx.shadowBlur = shadowBloom;
+      ctx.strokeStyle = `rgba(0, 240, 255, ${0.4 + beatIntensity * 0.55})`;
+      ctx.lineWidth = 1.5 + beatIntensity * 1.8;
       ctx.beginPath();
       ctx.moveTo(0, horizonY);
       ctx.lineTo(width, horizonY);
@@ -98,20 +113,25 @@ export default function TronCanvas() {
         if (p.y < 0) p.y = height;
         if (p.y > height) p.y = 0;
 
+        // Particle size & alpha pulse on beat
+        const pSize = p.size * (1 + beatIntensity * 0.35);
+        const pAlpha = Math.min(1.0, p.alpha + beatIntensity * 0.35);
+
         ctx.fillStyle = p.color;
-        ctx.globalAlpha = p.alpha;
+        ctx.globalAlpha = pAlpha;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, pSize, 0, Math.PI * 2);
         ctx.fill();
 
         // Subtle interconnecting data lines between nearby particles
+        const connectionThreshold = 90 + beatIntensity * 25;
         for (let j = i + 1; j < particles.length; j++) {
           const p2 = particles[j];
           const dist = Math.hypot(p.x - p2.x, p.y - p2.y);
-          if (dist < 90) {
+          if (dist < connectionThreshold) {
             ctx.strokeStyle = '#00f0ff';
-            ctx.globalAlpha = (1 - dist / 90) * 0.15;
-            ctx.lineWidth = 0.5;
+            ctx.globalAlpha = (1 - dist / connectionThreshold) * (0.15 + beatIntensity * 0.3);
+            ctx.lineWidth = 0.5 + beatIntensity * 0.5;
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
             ctx.lineTo(p2.x, p2.y);
@@ -128,6 +148,7 @@ export default function TronCanvas() {
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      unsubscribeBeat();
       cancelAnimationFrame(animationFrameId);
     };
   }, []);

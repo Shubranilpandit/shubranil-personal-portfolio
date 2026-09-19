@@ -62,7 +62,7 @@ export default function Navbar({
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full z-40 bg-tron-void/90 backdrop-blur-xl border-b border-tron-border/90 shadow-[0_4px_30px_rgba(0,0,0,0.85)]">
+    <header className="fixed top-0 left-0 right-0 w-full z-40 bg-tron-void/90 backdrop-blur-xl border-b border-tron-border/90 shadow-[0_4px_30px_rgba(0,0,0,0.85)] audio-reactive-border">
       
       {/* Top Telemetry Strip (100% full width, responsive padding) */}
       <div className="w-full px-[clamp(1rem,3vw,2.5rem)] py-1 bg-tron-dark/95 border-b border-tron-border/50 text-[clamp(0.6rem,0.7vw,0.75rem)] font-mono tracking-widest text-slate-400 flex items-center justify-between overflow-hidden">

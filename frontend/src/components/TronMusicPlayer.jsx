@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, Volume2, VolumeX, Disc, AlertTriangle, ChevronDown, ChevronUp, Sparkles, RefreshCw, Volume1 } from 'lucide-react';
 import { sound } from '../services/soundService';
+import { audioReactive } from '../services/audioReactiveService';
 
 export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -78,7 +79,11 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.load();
+      audioReactive.setAudioElement(audioRef.current);
     }
+    return () => {
+      audioReactive.setPlaying(false);
+    };
   }, []);
 
   // Audio element event handlers
@@ -89,6 +94,7 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
       sound.startTronTheme(isMuted ? 0 : volume);
       setIsPlaying(true);
       setAudioState('PLAYING');
+      audioReactive.setPlaying(true, isMuted ? 0 : volume);
       localStorage.setItem('tron_audio_enabled', 'true');
       if (onEnableAudio) onEnableAudio();
       return;
@@ -109,6 +115,8 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
         setTrackMissing(false);
         setAudioLoaded(true);
         setAudioState('PLAYING');
+        audioReactive.setAudioElement(audioRef.current);
+        audioReactive.setPlaying(true, isMuted ? 0 : volume);
         localStorage.setItem('tron_audio_enabled', 'true');
         if (onEnableAudio) onEnableAudio();
         return;
@@ -123,12 +131,15 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
           setTrackMissing(false);
           setAudioLoaded(true);
           setAudioState('PLAYING');
+          audioReactive.setAudioElement(audioRef.current);
+          audioReactive.setPlaying(true, isMuted ? 0 : volume);
           localStorage.setItem('tron_audio_enabled', 'true');
           return;
         } catch (retryErr) {
           console.warn("Retry failed:", retryErr);
           setTrackMissing(true);
           setAudioState('ERROR');
+          audioReactive.setPlaying(false);
         }
       }
     }
@@ -142,6 +153,7 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
       audioRef.current.pause();
     }
     setIsPlaying(false);
+    audioReactive.setPlaying(false);
     setAudioState('PAUSED');
   };
 
@@ -195,6 +207,7 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
     const val = parseFloat(e.target.value);
     setVolume(val);
     localStorage.setItem('tron_audio_volume', val.toString());
+    audioReactive.setVolume(isMuted ? 0 : val);
     if (useProceduralSynth) {
       sound.setThemeVolume(isMuted ? 0 : val);
     } else if (audioRef.current) {
@@ -206,6 +219,7 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
     sound.playClick();
     const nextMuted = !isMuted;
     setIsMuted(nextMuted);
+    audioReactive.setVolume(nextMuted ? 0 : volume);
     if (useProceduralSynth) {
       sound.setThemeVolume(nextMuted ? 0 : volume);
     } else if (audioRef.current) {
@@ -229,6 +243,7 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
     sound.playClick();
     setUseProceduralSynth(true);
     setTrackMissing(false);
+    audioReactive.setPlaying(true, isMuted ? 0 : volume);
     handlePlay();
   };
 
@@ -244,9 +259,9 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
     }
     if (isPlaying) {
       return (
-        <span className="text-tron-cyan flex items-center gap-1 font-mono text-[10px] animate-pulse">
-          <span className="w-2 h-2 rounded-full bg-tron-cyan shadow-cyan-glow-sm" />
-          ● PLAYING
+        <span className="text-tron-cyan flex items-center gap-1 font-mono text-[10px]">
+          <span className="w-2 h-2 rounded-full bg-tron-cyan shadow-cyan-glow-sm animate-pulse" />
+          ● PLAYING [BEAT SYNC]
         </span>
       );
     }
@@ -271,14 +286,17 @@ export default function TronMusicPlayer({ isAudioEnabled, onEnableAudio }) {
         onLoadedMetadata={handleLoadedMetadata}
         onCanPlay={handleCanPlay}
         onError={handleAudioError}
-        onEnded={() => setIsPlaying(false)}
+        onEnded={() => {
+          setIsPlaying(false);
+          audioReactive.setPlaying(false);
+        }}
       >
         <source src="/audio/end-of-line.mp3" type="audio/mpeg" />
         <source src="./audio/end-of-line.mp3" type="audio/mpeg" />
       </audio>
 
       {/* Futuristic Floating HUD Card */}
-      <div className="bg-tron-panel/95 backdrop-blur-xl border border-tron-cyan/60 rounded clip-chamfer shadow-cyan-glow p-4 relative w-[350px] max-w-full">
+      <div className="bg-tron-panel/95 backdrop-blur-xl border border-tron-cyan/60 rounded clip-chamfer shadow-cyan-glow p-4 relative w-[350px] max-w-full audio-reactive-border">
         <div className="hud-corner hud-corner-tl" />
         <div className="hud-corner hud-corner-tr" />
         <div className="hud-corner hud-corner-bl" />

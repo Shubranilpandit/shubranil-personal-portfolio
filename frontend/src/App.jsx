@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import TronCanvas from './components/TronCanvas';
+import AudioReactiveLighting from './components/AudioReactiveLighting';
 import BootScreen from './components/BootScreen';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -81,6 +82,9 @@ export default function App() {
       
       {/* TRON Digital Grid & Particle Canvas */}
       <TronCanvas />
+
+      {/* Dynamic Audio-Reactive Ambient Lighting & Beat Aura */}
+      <AudioReactiveLighting />
 
       {/* Subtle CRT Scanline overlay effect */}
       <div className="scanlines" aria-hidden="true" />

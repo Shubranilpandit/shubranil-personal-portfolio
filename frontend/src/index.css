@@ -5,6 +5,8 @@
 @layer base {
   :root {
     color-scheme: dark;
+    --beat-intensity: 0;
+    --beat-glow-blur: 0px;
   }
 
   body {
@@ -66,6 +68,15 @@
 .tron-panel:hover {
   border-color: rgba(0, 240, 255, 0.4);
   box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.65), 0 0 20px rgba(0, 240, 255, 0.15), inset 0 0 20px rgba(0, 240, 255, 0.08);
+}
+
+/* Audio-reactive beat lighting & edge luminescence */
+.audio-reactive-border {
+  transition: border-color 0.08s ease-out, box-shadow 0.08s ease-out;
+  border-color: rgba(0, 240, 255, calc(0.35 + var(--beat-intensity) * 0.65)) !important;
+  box-shadow: 
+    0 4px 30px rgba(0, 0, 0, 0.85),
+    0 0 calc(var(--beat-glow-blur) * 0.85) rgba(0, 240, 255, calc(var(--beat-intensity) * 0.45)) !important;
 }
 
 /* Chamfered corner accents */
