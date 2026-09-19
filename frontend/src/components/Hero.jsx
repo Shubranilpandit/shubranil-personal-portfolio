@@ -9,7 +9,7 @@ export default function Hero({ profile, onOpenTerminal }) {
   return (
     <section
       id="system"
-      className="relative min-h-screen flex items-center justify-center pt-20 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden"
+      className="relative min-h-screen flex items-center justify-center pt-28 sm:pt-36 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden"
     >
       {/* Radial ambient cyber glow behind hero */}
       <div className="absolute w-[600px] h-[600px] rounded-full bg-tron-cyan/5 blur-[120px] pointer-events-none" />
