@@ -64,7 +64,7 @@ export default function SystemHero() {
 
         {/* Name */}
         <h1 className="font-display font-black text-3xl sm:text-5xl md:text-6xl text-white tracking-[0.18em] uppercase">
-          SHUBRANIL GOUTAM PANDIT
+          SHUBRANIL PANDIT
         </h1>
 
         {/* Specialization */}

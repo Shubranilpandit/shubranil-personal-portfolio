@@ -16,7 +16,7 @@ export default function Footer() {
         {/* Brand & Identity */}
         <div>
           <div className="font-display font-black text-sm text-white tracking-[0.2em] uppercase">
-            SHUBRANIL GOUTAM PANDIT
+            SHUBRANIL PANDIT
           </div>
           <div className="font-mono text-[10px] text-tron-cyan/70 tracking-widest mt-0.5">
             MCA — DATA SCIENCE // DIGITAL IDENTITY CORE // 2026
