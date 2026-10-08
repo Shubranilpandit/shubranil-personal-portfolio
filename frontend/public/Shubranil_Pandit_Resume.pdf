@@ -1,0 +1,121 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]
+   /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >>
+   /Contents 6 0 R
+>>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Length 2818 >>
+stream
+
+BT
+/F1 22 Tf
+50 740 Td
+(SHUBRANIL GOUTAM PANDIT) Tj
+/F2 10 Tf
+0 -18 Td
+(Email: shubranilp@gmail.com | Phone: +91 9172288330 | Solapur, Maharashtra, India) Tj
+0 -14 Td
+(GitHub: github.com/Shubranilpandit | LinkedIn: linkedin.com/in/shubranilpandit) Tj
+
+/F1 13 Tf
+0 -26 Td
+(PROFESSIONAL SUMMARY) Tj
+/F2 10 Tf
+0 -14 Td
+(Motivated MCA student specializing in Data Science with strong hands-on experience in) Tj
+0 -13 Td
+(Python, Flask, JavaScript, React, PostgreSQL, Computer Vision, and statistical data mining.) Tj
+0 -13 Td
+(Demonstrated ability to deliver functional end-to-end applications and complex data pipelines.) Tj
+
+/F1 13 Tf
+0 -24 Td
+(EDUCATION) Tj
+/F2 10 Tf
+0 -14 Td
+(Master of Computer Applications (MCA) - Data Science | 2025 - 2027) Tj
+0 -12 Td
+(MIT Vishwaprayag University, Solapur | CGPA: 7.92 / 10) Tj
+0 -14 Td
+(Bachelor of Computer Applications (BCA) - Full Time | 2022 - 2025) Tj
+0 -12 Td
+(Abhijit Kadam Institute of Management and Social Sciences, Solapur | CGPA: 9.00 / 10) Tj
+0 -14 Td
+(12th Higher Secondary Education (HSC) | 2022 | DHB Soni College, Solapur | 72.33%) Tj
+0 -14 Td
+(10th Secondary School Certificate (SSC) | 2020 | Raj Memorial English School, Solapur | 65.00%) Tj
+
+/F1 13 Tf
+0 -24 Td
+(PROJECTS) Tj
+/F2 10 Tf
+0 -14 Td
+(1. V-Mirror - Virtual Try-On Web Application | Jan 2026 - Apr 2026) Tj
+0 -12 Td
+(Technologies: Python, Flask, MediaPipe, OpenCV, Computer Vision, JavaScript, HTML5, CSS3) Tj
+0 -12 Td
+(- Implemented real-time facial landmark detection using MediaPipe for virtual accessory try-on.) Tj
+0 -12 Td
+(- Engineered dynamic coordinate mapping algorithms for realistic sunglasses and hats placement.) Tj
+0 -12 Td
+(- Developed modular Flask REST APIs for photo uploads, rendering pipelines, and telemetry.) Tj
+
+0 -16 Td
+(2. Stability-Aware Mining of Polypharmacy-Associated Serious ADRs (FAERS) | Jan 2026 - Jul 2026) Tj
+0 -12 Td
+(Technologies: Python, Pandas, PostgreSQL, SQL, Data Cleaning, EDA, Signal Mining) Tj
+0 -12 Td
+(- Harmonized multi-quarter FDA FAERS safety reports, standardizing drug names and reaction terms.) Tj
+0 -12 Td
+(- Calculated disproportionality metrics (PRR, ROR) to isolate statistically significant polypharmacy ADRs.) Tj
+0 -12 Td
+(- Designed efficient PostgreSQL queries and indexed database tables for fast large-scale retrieval.) Tj
+
+/F1 13 Tf
+0 -24 Td
+(TECHNICAL SKILLS) Tj
+/F2 10 Tf
+0 -14 Td
+(Programming Languages: Python, JavaScript, SQL) Tj
+0 -13 Td
+(Frontend Development: HTML5, CSS3, React, Vite, Tailwind CSS) Tj
+0 -13 Td
+(Backend Development: Python Flask, RESTful APIs, JSON) Tj
+0 -13 Td
+(Databases: PostgreSQL, Relational Database Management (RDBMS)) Tj
+0 -13 Td
+(Data Science & AI: Pandas, NumPy, Data Cleaning, EDA, MediaPipe, Computer Vision) Tj
+0 -13 Td
+(Tools & Platforms: Git, GitHub, VS Code, Postman, Linux / Windows) Tj
+ET
+
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000266 00000 n 
+0000000345 00000 n 
+0000000419 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+3318
+%%EOF

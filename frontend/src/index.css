@@ -195,3 +195,20 @@
     linear-gradient(to bottom, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
   background-size: 40px 40px;
 }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.z-60 {
+  z-index: 60;
+}
+
+.z-70 {
+  z-index: 70;
+}

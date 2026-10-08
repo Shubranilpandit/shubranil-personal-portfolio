@@ -1,172 +1,66 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import TronCanvas from './components/TronCanvas';
-import AudioReactiveLighting from './components/AudioReactiveLighting';
-import BootScreen from './components/BootScreen';
+import React, { useState } from 'react';
+import CinematicWelcome from './components/CinematicWelcome';
+import TronBackground from './components/TronBackground';
 import Navbar from './components/Navbar';
-import Hero from './components/Hero';
-import About from './components/About';
-import Skills from './components/Skills';
-import Projects from './components/Projects';
-import Education from './components/Education';
-import Experience from './components/Experience';
-import Achievements from './components/Achievements';
-import Resume from './components/Resume';
-import GitHubActivity from './components/GitHubActivity';
-import Contact from './components/Contact';
+import SystemHero from './components/SystemHero';
+import AboutSection from './components/AboutSection';
+import SkillsSection from './components/SkillsSection';
+import ProjectsSection from './components/ProjectsSection';
+import EducationSection from './components/EducationSection';
+import ResumeSection from './components/ResumeSection';
+import ContactSection from './components/ContactSection';
+import FloatingAudioPlayer from './components/FloatingAudioPlayer';
 import Footer from './components/Footer';
-import SystemStatusModal from './components/SystemStatusModal';
-import InteractiveTerminal from './components/InteractiveTerminal';
-import AdminDashboard from './components/AdminDashboard';
-import TronMusicPlayer from './components/TronMusicPlayer';
-import { api } from './services/api';
-import { sound } from './services/soundService';
 
+/**
+ * SHUBRANIL PANDIT — MINIMAL TRON DIGITAL IDENTITY SYSTEM
+ * Less UI, More Atmosphere.
+ * Layer hierarchy:
+ * Layer 1: TronBackground Canvas (z-0)
+ * Layer 2: Subtle scanlines (z-10)
+ * Layer 3: Main content sections (z-20)
+ * Layer 4: FloatingAudioPlayer (z-30)
+ * Layer 5: Navbar (z-40)
+ * Layer 6: Mobile Menu Overlay in Navbar (z-50)
+ * Layer 7: ProjectModal (z-60)
+ * Layer 8: CinematicWelcome Intro (z-70)
+ */
 export default function App() {
-  const [bootComplete, setBootComplete] = useState(false);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(() => {
-    return localStorage.getItem('tron_audio_enabled') === 'true';
-  });
-
-  // Modals
-  const [isHealthOpen, setIsHealthOpen] = useState(false);
-  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
-
-  // Data
-  const [systemStatus, setSystemStatus] = useState('ONLINE');
-  const [profile, setProfile] = useState(null);
-  const [skillsData, setSkillsData] = useState({ categories: [], all_skills: [] });
-  const [projects, setProjects] = useState([]);
-  const [projectCategories, setProjectCategories] = useState(['All']);
-  const [educationList, setEducationList] = useState([]);
-  const [experienceList, setExperienceList] = useState([]);
-  const [achievementsList, setAchievementsList] = useState([]);
-  const [githubData, setGithubData] = useState(null);
-
-  const fetchAllData = useCallback(async () => {
-    try {
-      const [profRes, skillsRes, projsRes, eduRes, expRes, achRes, ghRes, healthRes] =
-        await Promise.allSettled([
-          api.getProfile(),
-          api.getSkills(),
-          api.getProjects(),
-          api.getEducation(),
-          api.getExperience(),
-          api.getAchievements(),
-          api.getGithub(),
-          api.getHealth(),
-        ]);
-
-      if (profRes.status === 'fulfilled') setProfile(profRes.value.data);
-      if (skillsRes.status === 'fulfilled') setSkillsData(skillsRes.value);
-      if (projsRes.status === 'fulfilled') {
-        setProjects(projsRes.value.data || []);
-        if (projsRes.value.categories) setProjectCategories(projsRes.value.categories);
-      }
-      if (eduRes.status === 'fulfilled') setEducationList(eduRes.value.data || []);
-      if (expRes.status === 'fulfilled') setExperienceList(expRes.value.data || []);
-      if (achRes.status === 'fulfilled') setAchievementsList(achRes.value.data || []);
-      if (ghRes.status === 'fulfilled') setGithubData(ghRes.value.data);
-      if (healthRes.status === 'fulfilled') setSystemStatus(healthRes.value.status || 'ONLINE');
-    } catch (err) {
-      console.warn("Portfolio data fetch notice:", err);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAllData();
-  }, [fetchAllData]);
+  const [welcomeComplete, setWelcomeComplete] = useState(false);
 
   return (
-    <div className="relative min-h-screen bg-tron-void text-tron-text overflow-x-hidden">
+    <div className="relative min-h-screen bg-tron-void text-tron-text overflow-x-hidden selection:bg-tron-cyan selection:text-black">
       
-      {/* TRON Digital Grid & Particle Canvas */}
-      <TronCanvas />
-
-      {/* Dynamic Audio-Reactive Ambient Lighting & Beat Aura */}
-      <AudioReactiveLighting />
-
-      {/* Subtle CRT Scanline overlay effect */}
-      <div className="scanlines" aria-hidden="true" />
-
-      {/* Cinematic Boot Screen (first load with audio enablement prompt) */}
-      {!bootComplete && (
-        <BootScreen
-          onComplete={() => setBootComplete(true)}
-          onEnableAudio={() => setIsAudioEnabled(true)}
-        />
+      {/* Layer 8: Cinematic Opening / Welcome Screen (~8-second Tron Legacy Intro) */}
+      {!welcomeComplete && (
+        <CinematicWelcome onComplete={() => setWelcomeComplete(true)} />
       )}
 
-      {/* 100% Full-Width Top Navigation HUD with Futuristic Burger Menu */}
-      <Navbar
-        systemStatus={systemStatus}
-        onOpenHealth={() => setIsHealthOpen(true)}
-        onOpenTerminal={() => setIsTerminalOpen(true)}
-        onOpenAdmin={() => setIsAdminOpen(true)}
-        onToggleAudioPlayer={() => setIsAudioEnabled(prev => !prev)}
-      />
+      {/* Layer 1: High-Performance TRON Grid Canvas */}
+      <TronBackground />
 
-      {/* Main Content Sections */}
-      <main className="relative z-10">
-        <Hero
-          profile={profile}
-          onOpenTerminal={() => setIsTerminalOpen(true)}
-        />
+      {/* Layer 2: Subtle CRT Scanline overlay effect */}
+      <div className="scanlines pointer-events-none fixed inset-0 z-10" aria-hidden="true" />
 
-        <About profile={profile} />
+      {/* Layer 5: 100% Full-Width Responsive Navbar (Drawer is Layer 6 at z-50) */}
+      <Navbar />
 
-        <Skills skillsData={skillsData} />
+      {/* Layer 4: Floating Circular Audio Player (z-30 — strictly BELOW mobile menu z-50) */}
+      <FloatingAudioPlayer />
 
-        <Projects
-          projects={projects}
-          categories={projectCategories}
-        />
-
-        <Education educationList={educationList} />
-
-        <Experience experienceList={experienceList} />
-
-        <Achievements achievementsList={achievementsList} />
-
-        <GitHubActivity githubData={githubData} />
-
-        <Resume />
-
-        <Contact />
+      {/* Layer 3: Main Content Sections (z-20) */}
+      <main className="relative z-20">
+        <SystemHero />
+        <AboutSection />
+        <SkillsSection />
+        <ProjectsSection />
+        <EducationSection />
+        <ResumeSection />
+        <ContactSection />
       </main>
 
-      {/* Technical Footer */}
-      <Footer
-        onOpenTerminal={() => setIsTerminalOpen(true)}
-        onOpenAdmin={() => setIsAdminOpen(true)}
-      />
-
-      {/* Auxiliary Interactive Modals */}
-      <SystemStatusModal
-        isOpen={isHealthOpen}
-        onClose={() => setIsHealthOpen(false)}
-      />
-
-      <InteractiveTerminal
-        isOpen={isTerminalOpen}
-        onClose={() => setIsTerminalOpen(false)}
-        projects={projects}
-        skills={skillsData?.all_skills || []}
-        profile={profile}
-      />
-
-      <AdminDashboard
-        isOpen={isAdminOpen}
-        onClose={() => setIsAdminOpen(false)}
-        onDataUpdated={fetchAllData}
-      />
-
-      {/* TRON: Legacy "End of Line" Music Player Module */}
-      <TronMusicPlayer
-        isAudioEnabled={isAudioEnabled}
-        onEnableAudio={() => setIsAudioEnabled(true)}
-      />
-
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }
