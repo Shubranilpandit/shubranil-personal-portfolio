@@ -55,10 +55,26 @@ export default function FloatingAudioPlayer() {
   return (
     <div
       ref={playerRef}
-      className="fixed bottom-6 right-6 z-30 select-none"
+      className="fixed bottom-6 right-6 z-30 select-none flex flex-col-reverse sm:flex-row items-end sm:items-center gap-2 sm:gap-3"
       role="region"
       aria-label="TRON Audio Player"
     >
+      {/* Subtle, non-blocking prompt when browser autoplay was prevented */}
+      {audioState.autoplayBlocked && !audioState.isPlaying && !isOpen && (
+        <button
+          onClick={() => audioSystem.play()}
+          className="group animate-fade-in flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-tron-void/90 backdrop-blur-md border border-tron-cyan/70 text-tron-cyan hover:border-tron-cyan hover:bg-tron-cyan/15 hover:text-white transition-all duration-300 shadow-[0_0_15px_rgba(0,240,255,0.3)] hover:shadow-[0_0_25px_rgba(0,240,255,0.6)] cursor-pointer"
+          role="status"
+          aria-label="Click to enable soundtrack"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-tron-cyan animate-ping shrink-0" />
+          <Volume2 className="w-3.5 h-3.5 text-tron-cyan shrink-0" />
+          <span className="font-mono text-[11px] tracking-wider uppercase font-semibold text-slate-200 group-hover:text-white transition-colors">
+            Click to enable soundtrack
+          </span>
+        </button>
+      )}
+
       {/* 1. Default State: Small Circular Floating Control (w-12 h-12) */}
       {!isOpen && (
         <button

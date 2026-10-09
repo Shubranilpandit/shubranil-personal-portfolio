@@ -11,6 +11,7 @@ import ResumeSection from './components/ResumeSection';
 import ContactSection from './components/ContactSection';
 import FloatingAudioPlayer from './components/FloatingAudioPlayer';
 import Footer from './components/Footer';
+import { audioSystem } from './services/audioService';
 
 /**
  * SHUBRANIL PANDIT — MINIMAL TRON DIGITAL IDENTITY SYSTEM
@@ -28,12 +29,18 @@ import Footer from './components/Footer';
 export default function App() {
   const [welcomeComplete, setWelcomeComplete] = useState(false);
 
+  // Preload audio asset so buffer is ready upon welcome completion
+  React.useEffect(() => {
+    audioSystem.init();
+  }, []);
+
   // Global safety watchdog: guarantees welcome screen cannot block the portfolio indefinitely
   React.useEffect(() => {
     const fallbackTimer = setTimeout(() => {
       setWelcomeComplete((done) => {
         if (!done) {
           console.warn('App safety watchdog: Auto-transitioning to main portfolio.');
+          audioSystem.play().catch(() => {});
           return true;
         }
         return done;
@@ -43,12 +50,26 @@ export default function App() {
     return () => clearTimeout(fallbackTimer);
   }, []);
 
+  const handleWelcomeComplete = () => {
+    setWelcomeComplete(true);
+    // Explicitly trigger soundtrack playback when welcome completes
+    audioSystem.play()
+      .then((started) => {
+        if (started) {
+          console.debug('Soundtrack playback active upon welcome completion.');
+        }
+      })
+      .catch((err) => {
+        console.debug('Soundtrack playback deferred on welcome completion:', err);
+      });
+  };
+
   return (
     <div className="relative min-h-screen bg-tron-void text-tron-text overflow-x-hidden selection:bg-tron-cyan selection:text-black">
       
       {/* Layer 8: Cinematic Opening / Welcome Screen (~8-second Tron Legacy Intro) */}
       {!welcomeComplete && (
-        <CinematicWelcome onComplete={() => setWelcomeComplete(true)} />
+        <CinematicWelcome onComplete={handleWelcomeComplete} />
       )}
 
       {/* Layer 1: High-Performance TRON Grid Canvas */}

@@ -42,10 +42,18 @@ export default function CinematicWelcome({ onComplete }) {
     if (hasTransitionedRef.current) return;
     hasTransitionedRef.current = true;
 
-    // Attempt non-blocking audio play in background
-    audioSystem.play().catch((err) => {
-      console.debug('Autoplay deferred to explicit user interaction:', err);
-    });
+    // Immediately attempt to play soundtrack upon transition initiation
+    audioSystem.play()
+      .then((started) => {
+        if (started) {
+          console.debug('Soundtrack playback active.');
+        } else {
+          console.debug('Autoplay deferred by browser policy; user interaction listener active.');
+        }
+      })
+      .catch((err) => {
+        console.debug('Soundtrack playback deferred:', err);
+      });
 
     setIsFadingOut(true);
 

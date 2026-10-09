@@ -3,6 +3,13 @@
  * Manages playback of "End of Line" (TRON: Legacy / Daft Punk)
  * Provides Web Audio API frequency analysis and 115 BPM rhythm pulse telemetry.
  * Optimizes performance by stopping loops when paused.
+ *
+ * Resilient features:
+ * - Preloads audio early during welcome animation.
+ * - Idempotent play() with in-flight promise sharing to prevent duplicate instances.
+ * - Graceful browser autoplay blocking detection with one-time user-gesture fallback.
+ * - Preserves volume and mute settings.
+ * - Non-blocking error handling.
  */
 
 class AudioService {
@@ -23,6 +30,12 @@ class AudioService {
     this.artist = "TRON: LEGACY / SCORE";
     this.initialized = false;
     this.proceduralFallback = false;
+
+    // Autoplay & Gesture Fallback State
+    this.autoplayBlocked = false;
+    this.userExplicitlyPaused = false;
+    this.activePlayPromise = null;
+    this.interactionCleanup = null;
   }
 
   init() {
@@ -53,6 +66,9 @@ class AudioService {
         console.warn("Direct audio file notice, enabling procedural fallback:", e);
         this.proceduralFallback = true;
       });
+
+      // Warm up buffer
+      this.audio.load();
     } catch (err) {
       console.warn("Audio element initialization warning:", err);
       this.proceduralFallback = true;
@@ -73,36 +89,63 @@ class AudioService {
   }
 
   async play() {
-    try {
-      this.init();
-      this.setupWebAudio();
-
-      if (this.audioCtx && this.audioCtx.state === 'suspended') {
-        try {
-          await this.audioCtx.resume();
-        } catch {}
-      }
-
-      if (!this.audio) {
-        return false;
-      }
-
-      this.audio.volume = this.isMuted ? 0 : this.volume;
-      const playPromise = this.audio.play();
-      if (playPromise !== undefined) {
-        await playPromise;
-      }
-      this.isPlaying = true;
-      this.startBeatLoop();
-      this.notify();
+    // If already playing, return immediately
+    if (this.isPlaying) {
       return true;
-    } catch (err) {
-      console.debug("Audio playback prevented by browser policy or file unavailable:", err);
-      this.isPlaying = false;
-      this.stopBeatLoop();
-      this.notify();
-      return false;
     }
+
+    // If a play request is already in-flight, return the existing promise
+    if (this.activePlayPromise) {
+      return this.activePlayPromise;
+    }
+
+    this.activePlayPromise = (async () => {
+      try {
+        this.init();
+        this.setupWebAudio();
+
+        if (this.audioCtx && this.audioCtx.state === 'suspended') {
+          try {
+            await this.audioCtx.resume();
+          } catch {}
+        }
+
+        if (!this.audio) {
+          return false;
+        }
+
+        this.audio.volume = this.isMuted ? 0 : this.volume;
+        const playPromise = this.audio.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+        }
+
+        this.isPlaying = true;
+        this.autoplayBlocked = false;
+        this.userExplicitlyPaused = false;
+        this.removeInteractionListener();
+        this.startBeatLoop();
+        this.notify();
+        return true;
+      } catch (err) {
+        console.debug("Audio playback deferred or prevented by browser policy:", err);
+        this.isPlaying = false;
+        this.stopBeatLoop();
+
+        // If not explicitly paused by user, prime user-interaction listener
+        if (!this.userExplicitlyPaused) {
+          this.autoplayBlocked = true;
+          this.enableOnNextInteraction();
+        }
+
+        this.notify();
+        return false;
+      } finally {
+        this.activePlayPromise = null;
+      }
+    })();
+
+    return this.activePlayPromise;
   }
 
   pause() {
@@ -111,7 +154,11 @@ class AudioService {
         this.audio.pause();
       }
     } catch {}
+
     this.isPlaying = false;
+    this.userExplicitlyPaused = true;
+    this.autoplayBlocked = false;
+    this.removeInteractionListener();
     this.stopBeatLoop();
     this.resetCssGlow();
     this.notify();
@@ -121,6 +168,7 @@ class AudioService {
     if (this.isPlaying) {
       this.pause();
     } else {
+      this.userExplicitlyPaused = false;
       this.play();
     }
   }
@@ -154,6 +202,40 @@ class AudioService {
       this.resetCssGlow();
     }
     this.notify();
+  }
+
+  /**
+   * Listen for the next user interaction to trigger audio if autoplay was blocked.
+   */
+  enableOnNextInteraction() {
+    if (typeof window === 'undefined' || this.interactionCleanup) return;
+
+    const onUserGesture = () => {
+      this.removeInteractionListener();
+      if (!this.isPlaying && !this.userExplicitlyPaused) {
+        this.play().catch(() => {});
+      }
+    };
+
+    const options = { once: true, passive: true, capture: true };
+    window.addEventListener('click', onUserGesture, options);
+    window.addEventListener('keydown', onUserGesture, options);
+    window.addEventListener('pointerdown', onUserGesture, options);
+    window.addEventListener('touchstart', onUserGesture, options);
+
+    this.interactionCleanup = () => {
+      window.removeEventListener('click', onUserGesture, options);
+      window.removeEventListener('keydown', onUserGesture, options);
+      window.removeEventListener('pointerdown', onUserGesture, options);
+      window.removeEventListener('touchstart', onUserGesture, options);
+      this.interactionCleanup = null;
+    };
+  }
+
+  removeInteractionListener() {
+    if (this.interactionCleanup) {
+      this.interactionCleanup();
+    }
   }
 
   startBeatLoop() {
@@ -234,6 +316,7 @@ class AudioService {
       duration: this.duration,
       trackTitle: this.trackTitle,
       artist: this.artist,
+      autoplayBlocked: this.autoplayBlocked,
     };
   }
 }
