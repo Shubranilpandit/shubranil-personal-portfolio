@@ -1,3 +1,5 @@
+import os
+import requests
 from flask import Blueprint, jsonify, request, current_app
 from backend.models import db, ContactMessage
 from backend.utils.validators import validate_email, check_rate_limit
@@ -5,9 +7,40 @@ from backend.utils.validators import validate_email, check_rate_limit
 contact_bp = Blueprint("contact", __name__, url_prefix="/api/contact")
 
 
+def send_email_notification(name, email, subject, message):
+    """Securely dispatch email notification via server-side transactional email service."""
+    api_key = os.getenv("RESEND_API_KEY") or os.getenv("EMAIL_API_KEY")
+    contact_email = os.getenv("CONTACT_EMAIL", "shubranilp@gmail.com")
+    if not api_key:
+        return False
+
+    try:
+        from_email = os.getenv("EMAIL_FROM", "Portfolio Transmission <onboarding@resend.dev>")
+        resp = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": from_email,
+                "to": [contact_email],
+                "reply_to": email,
+                "subject": f"[Portfolio Contact] {subject}",
+                "text": f"New transmission from {name} <{email}>:\n\nSubject: {subject}\n\nMessage:\n{message}",
+                "html": f"<p><strong>From:</strong> {name} ({email})</p><p><strong>Subject:</strong> {subject}</p><p><strong>Message:</strong></p><p>{message}</p>",
+            },
+            timeout=8,
+        )
+        return resp.status_code in (200, 201)
+    except Exception as exc:
+        current_app.logger.warning(f"Email dispatch error: {exc}")
+        return False
+
+
 @contact_bp.route("", methods=["POST"])
 def transmit_message():
-    """Receive and securely store contact transmission with validation and rate limiting."""
+    """Receive, securely store, and dispatch contact transmission."""
     # Rate limit check
     max_rate = current_app.config.get("RATELIMIT_CONTACT_PER_HOUR", 5)
     if not check_rate_limit(max_requests=max_rate, window_seconds=3600):
@@ -70,9 +103,13 @@ def transmit_message():
     db.session.add(msg)
     db.session.commit()
 
+    # Server-side email notification
+    email_dispatched = send_email_notification(name, email, subject, message)
+
     return jsonify({
         "status": "success",
         "transmission_code": f"TRX-{msg.id:05d}",
         "message": "Transmission successfully decoded and logged in the digital core.",
+        "email_dispatched": email_dispatched,
         "timestamp": msg.created_at.isoformat(),
     }), 201

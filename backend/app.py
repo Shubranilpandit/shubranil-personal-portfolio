@@ -54,9 +54,12 @@ def create_app(config_name=None):
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
 
-    # Auto-seed database if empty
+    # Auto-seed database if empty (graceful on serverless cold starts)
     with app.app_context():
-        seed_database_if_empty()
+        try:
+            seed_database_if_empty()
+        except Exception as seed_err:
+            app.logger.warning(f"Database seed notice: {seed_err}")
 
     # Global Error Handlers
     @app.errorhandler(404)
@@ -80,6 +83,8 @@ def create_app(config_name=None):
         return send_from_directory("static", path)
 
     @app.route("/")
+    @app.route("/api")
+    @app.route("/api/")
     def index():
         return jsonify({
             "system": "TRON: LEGACY PERSONAL DIGITAL IDENTITY CORE",

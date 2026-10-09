@@ -23,8 +23,11 @@ class Config:
             raw_db_url = raw_db_url.replace("postgres://", "postgresql://", 1)
         SQLALCHEMY_DATABASE_URI = raw_db_url
     else:
-        # Seamless local database fallback
-        sqlite_path = BASE_DIR / "portfolio.db"
+        # Seamless local database fallback (/tmp on Vercel serverless where root is read-only)
+        if os.getenv("VERCEL"):
+            sqlite_path = Path("/tmp") / "portfolio.db"
+        else:
+            sqlite_path = BASE_DIR / "portfolio.db"
         SQLALCHEMY_DATABASE_URI = f"sqlite:///{sqlite_path.as_posix()}"
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False

@@ -6,14 +6,20 @@ resume_bp = Blueprint("resume", __name__, url_prefix="/api/resume")
 
 
 def ensure_resume_file():
-    """Ensure a placeholder or real resume PDF exists in the static folder."""
+    """Ensure a placeholder or real resume PDF exists in the static folder or tmp."""
     static_dir = Path(current_app.config["STATIC_FOLDER"])
-    static_dir.mkdir(parents=True, exist_ok=True)
     resume_path = static_dir / "Shubranil_Pandit_Resume.pdf"
 
-    if not resume_path.exists():
-        # Generate a minimal valid PDF container
-        # Minimal PDF 1.4 template with metadata
+    if resume_path.exists():
+        return resume_path
+
+    target_path = resume_path
+    try:
+        static_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        target_path = Path("/tmp") / "Shubranil_Pandit_Resume.pdf"
+
+    if not target_path.exists():
         pdf_content = (
             b"%PDF-1.4\n"
             b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
@@ -29,10 +35,15 @@ def ensure_resume_file():
             b"xref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000056 00000 n \n0000000111 00000 n \n0000000212 00000 n \n0000000279 00000 n \n"
             b"trailer<</Size 6/Root 1 0 R>>\nstartxref\n579\n%%EOF\n"
         )
-        with open(resume_path, "wb") as f:
-            f.write(pdf_content)
+        try:
+            with open(target_path, "wb") as f:
+                f.write(pdf_content)
+        except OSError:
+            target_path = Path("/tmp") / "Shubranil_Pandit_Resume.pdf"
+            with open(target_path, "wb") as f:
+                f.write(pdf_content)
 
-    return resume_path
+    return target_path
 
 
 @resume_bp.route("/download", methods=["GET"])
