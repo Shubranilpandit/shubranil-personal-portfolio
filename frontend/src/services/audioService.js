@@ -5,11 +5,12 @@
  * Optimizes performance by stopping loops when paused.
  *
  * Resilient features:
- * - Preloads audio early during welcome animation.
- * - Idempotent play() with in-flight promise sharing to prevent duplicate instances.
+ * - Direct HTML5 Audio element event-driven state synchronization.
+ * - Idempotent play() with in-flight promise sharing to prevent duplicate instances or AbortError.
+ * - Non-blocking audioContext handling (never stalls playback).
+ * - Detailed error handling & diagnostics reporting (MediaError codes, autoplay blocks).
  * - Graceful browser autoplay blocking detection with one-time user-gesture fallback.
  * - Preserves volume and mute settings.
- * - Non-blocking error handling.
  */
 
 class AudioService {
@@ -19,6 +20,7 @@ class AudioService {
     this.analyser = null;
     this.source = null;
     this.isPlaying = false;
+    this.isBuffering = false;
     this.isMuted = false;
     this.volume = 0.35;
     this.currentTime = 0;
@@ -29,7 +31,7 @@ class AudioService {
     this.trackTitle = "END OF LINE";
     this.artist = "TRON: LEGACY / SCORE";
     this.initialized = false;
-    this.proceduralFallback = false;
+    this.errorMessage = null;
 
     // Autoplay & Gesture Fallback State
     this.autoplayBlocked = false;
@@ -48,6 +50,39 @@ class AudioService {
       this.audio.loop = true;
       this.audio.volume = this.volume;
 
+      // Real playback state synchronization with HTMLMediaElement events
+      this.audio.addEventListener('playing', () => {
+        this.isPlaying = true;
+        this.isBuffering = false;
+        this.errorMessage = null;
+        this.autoplayBlocked = false;
+        this.startBeatLoop();
+        this.notify();
+      });
+
+      this.audio.addEventListener('play', () => {
+        this.isBuffering = false;
+        this.errorMessage = null;
+        this.notify();
+      });
+
+      this.audio.addEventListener('pause', () => {
+        this.isPlaying = false;
+        this.stopBeatLoop();
+        this.resetCssGlow();
+        this.notify();
+      });
+
+      this.audio.addEventListener('waiting', () => {
+        this.isBuffering = true;
+        this.notify();
+      });
+
+      this.audio.addEventListener('canplay', () => {
+        this.isBuffering = false;
+        this.notify();
+      });
+
       this.audio.addEventListener('timeupdate', () => {
         this.currentTime = this.audio ? this.audio.currentTime : 0;
         this.notify();
@@ -63,15 +98,28 @@ class AudioService {
       });
 
       this.audio.addEventListener('error', (e) => {
-        console.warn("Direct audio file notice, enabling procedural fallback:", e);
-        this.proceduralFallback = true;
+        const err = this.audio ? this.audio.error : null;
+        let msg = 'Failed to load audio stream.';
+        if (err) {
+          switch (err.code) {
+            case 1: msg = 'Playback was aborted.'; break;
+            case 2: msg = 'Network error downloading audio asset.'; break;
+            case 3: msg = 'Audio decoding error occurred.'; break;
+            case 4: msg = 'Audio format not supported or file not found (/audio/end-of-line.mp3).'; break;
+            default: msg = err.message || 'Unknown media error.';
+          }
+        }
+        console.warn('Audio element error:', msg, err, e);
+        this.isPlaying = false;
+        this.isBuffering = false;
+        this.errorMessage = msg;
+        this.stopBeatLoop();
+        this.notify();
       });
-
-      // Warm up buffer
-      this.audio.load();
     } catch (err) {
       console.warn("Audio element initialization warning:", err);
-      this.proceduralFallback = true;
+      this.errorMessage = "Failed to initialize HTML5 Audio element.";
+      this.notify();
     }
   }
 
@@ -89,8 +137,16 @@ class AudioService {
   }
 
   async play() {
-    // If already playing, return immediately
-    if (this.isPlaying) {
+    this.init();
+
+    if (!this.audio) {
+      this.errorMessage = "Audio system unavailable.";
+      this.notify();
+      return false;
+    }
+
+    // If already actively playing, return immediately
+    if (this.isPlaying && !this.audio.paused) {
       return true;
     }
 
@@ -101,17 +157,12 @@ class AudioService {
 
     this.activePlayPromise = (async () => {
       try {
-        this.init();
+        this.errorMessage = null;
         this.setupWebAudio();
 
+        // Non-blocking resume of Web Audio context if available
         if (this.audioCtx && this.audioCtx.state === 'suspended') {
-          try {
-            await this.audioCtx.resume();
-          } catch {}
-        }
-
-        if (!this.audio) {
-          return false;
+          this.audioCtx.resume().catch(() => {});
         }
 
         this.audio.volume = this.isMuted ? 0 : this.volume;
@@ -121,21 +172,29 @@ class AudioService {
         }
 
         this.isPlaying = true;
+        this.isBuffering = false;
         this.autoplayBlocked = false;
         this.userExplicitlyPaused = false;
+        this.errorMessage = null;
         this.removeInteractionListener();
         this.startBeatLoop();
         this.notify();
         return true;
       } catch (err) {
-        console.debug("Audio playback deferred or prevented by browser policy:", err);
+        console.warn("Audio playback attempt failed:", err);
         this.isPlaying = false;
         this.stopBeatLoop();
 
-        // If not explicitly paused by user, prime user-interaction listener
-        if (!this.userExplicitlyPaused) {
-          this.autoplayBlocked = true;
-          this.enableOnNextInteraction();
+        if (err.name === 'NotAllowedError') {
+          if (!this.userExplicitlyPaused) {
+            this.autoplayBlocked = true;
+            this.enableOnNextInteraction();
+          }
+          this.errorMessage = "Browser policy blocked autoplay. Click to enable soundtrack.";
+        } else if (err.name === 'AbortError') {
+          console.debug("Play request was superseded by another operation.");
+        } else {
+          this.errorMessage = err.message || "Audio playback error occurred.";
         }
 
         this.notify();
@@ -149,35 +208,44 @@ class AudioService {
   }
 
   pause() {
-    try {
-      if (this.audio) {
-        this.audio.pause();
-      }
-    } catch {}
-
-    this.isPlaying = false;
     this.userExplicitlyPaused = true;
     this.autoplayBlocked = false;
     this.removeInteractionListener();
+
+    try {
+      if (this.audio && !this.audio.paused) {
+        this.audio.pause();
+      }
+    } catch (e) {
+      console.warn("Error pausing audio:", e);
+    }
+
+    this.isPlaying = false;
     this.stopBeatLoop();
     this.resetCssGlow();
     this.notify();
   }
 
   toggle() {
-    if (this.isPlaying) {
+    this.init();
+    if (this.isPlaying || (this.audio && !this.audio.paused)) {
       this.pause();
+      return Promise.resolve(false);
     } else {
       this.userExplicitlyPaused = false;
-      this.play();
+      return this.play();
     }
   }
 
   seek(seconds) {
     if (this.audio && !isNaN(seconds)) {
-      this.audio.currentTime = seconds;
-      this.currentTime = seconds;
-      this.notify();
+      try {
+        this.audio.currentTime = seconds;
+        this.currentTime = seconds;
+        this.notify();
+      } catch (e) {
+        console.warn("Audio seek error:", e);
+      }
     }
   }
 
@@ -310,6 +378,7 @@ class AudioService {
   getState() {
     return {
       isPlaying: this.isPlaying,
+      isBuffering: this.isBuffering,
       isMuted: this.isMuted,
       volume: this.volume,
       currentTime: this.currentTime,
@@ -317,6 +386,7 @@ class AudioService {
       trackTitle: this.trackTitle,
       artist: this.artist,
       autoplayBlocked: this.autoplayBlocked,
+      errorMessage: this.errorMessage,
     };
   }
 }

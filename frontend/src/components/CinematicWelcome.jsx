@@ -5,7 +5,7 @@ import { audioSystem } from '../services/audioService';
  * Cinematic TRON Opening Experience (~8-Second Sequence)
  * Inspired by TRON Legacy Intro:
  * 0–2.0s: Deep cinematic darkness, subtle ambient glow, system offline telemetry.
- * 2.0–5.0s: Electric neon tube flickering & voltage instability for 'WELCOME SHUBRANIL'.
+ * 2.0–5.0s: Electric neon tube flickering & voltage instability for 'WELCOME'.
  * 5.0–7.6s: Surrounding vector circuits & circular identity disc powering up, subtitle telemetry.
  * 7.6–8.0s: 100% Full illumination flash -> Soundtrack playback initiated in background.
  * ~8.0s: Automatic smooth transition to main portfolio.
@@ -285,7 +285,7 @@ export default function CinematicWelcome({ onComplete }) {
           }}
         />
 
-        {/* Main Neon Typography: WELCOME SHUBRANIL */}
+        {/* Main Neon Typography: WELCOME */}
         <div className="relative z-10 text-center px-4">
           <div
             className="font-display font-black tracking-[0.25em] sm:tracking-[0.35em] text-2xl sm:text-4xl md:text-5xl lg:text-6xl text-white uppercase transition-all duration-75"
@@ -298,7 +298,7 @@ export default function CinematicWelcome({ onComplete }) {
               filter: flickerOpacity < 0.4 ? 'blur(1px)' : 'none',
             }}
           >
-            WELCOME SHUBRANIL
+            WELCOME
           </div>
 
           {/* Subtitle Telemetry (Appears during 5-7.6s) */}
