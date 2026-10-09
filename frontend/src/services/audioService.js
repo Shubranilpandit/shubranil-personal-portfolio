@@ -29,33 +29,38 @@ class AudioService {
     if (this.initialized || typeof window === 'undefined') return;
     this.initialized = true;
 
-    this.audio = new Audio('/audio/end-of-line.mp3');
-    this.audio.preload = 'auto';
-    this.audio.loop = true;
-    this.audio.volume = this.volume;
+    try {
+      this.audio = new Audio('/audio/end-of-line.mp3');
+      this.audio.preload = 'auto';
+      this.audio.loop = true;
+      this.audio.volume = this.volume;
 
-    this.audio.addEventListener('timeupdate', () => {
-      this.currentTime = this.audio.currentTime;
-      this.notify();
-    });
+      this.audio.addEventListener('timeupdate', () => {
+        this.currentTime = this.audio ? this.audio.currentTime : 0;
+        this.notify();
+      });
 
-    this.audio.addEventListener('loadedmetadata', () => {
-      this.duration = this.audio.duration || 0;
-      this.notify();
-    });
+      this.audio.addEventListener('loadedmetadata', () => {
+        this.duration = this.audio ? (this.audio.duration || 0) : 0;
+        this.notify();
+      });
 
-    this.audio.addEventListener('ended', () => {
-      this.pause();
-    });
+      this.audio.addEventListener('ended', () => {
+        this.pause();
+      });
 
-    this.audio.addEventListener('error', (e) => {
-      console.warn("Direct audio file notice, enabling procedural fallback:", e);
+      this.audio.addEventListener('error', (e) => {
+        console.warn("Direct audio file notice, enabling procedural fallback:", e);
+        this.proceduralFallback = true;
+      });
+    } catch (err) {
+      console.warn("Audio element initialization warning:", err);
       this.proceduralFallback = true;
-    });
+    }
   }
 
   setupWebAudio() {
-    if (this.audioCtx) return;
+    if (this.audioCtx || typeof window === 'undefined') return;
     try {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) return;
@@ -68,16 +73,20 @@ class AudioService {
   }
 
   async play() {
-    this.init();
-    this.setupWebAudio();
-
-    if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      try {
-        await this.audioCtx.resume();
-      } catch (e) {}
-    }
-
     try {
+      this.init();
+      this.setupWebAudio();
+
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        try {
+          await this.audioCtx.resume();
+        } catch {}
+      }
+
+      if (!this.audio) {
+        return false;
+      }
+
       this.audio.volume = this.isMuted ? 0 : this.volume;
       const playPromise = this.audio.play();
       if (playPromise !== undefined) {
@@ -88,7 +97,7 @@ class AudioService {
       this.notify();
       return true;
     } catch (err) {
-      console.warn("Autoplay was prevented by browser policy:", err);
+      console.debug("Audio playback prevented by browser policy or file unavailable:", err);
       this.isPlaying = false;
       this.stopBeatLoop();
       this.notify();
@@ -97,9 +106,11 @@ class AudioService {
   }
 
   pause() {
-    if (this.audio) {
-      this.audio.pause();
-    }
+    try {
+      if (this.audio) {
+        this.audio.pause();
+      }
+    } catch {}
     this.isPlaying = false;
     this.stopBeatLoop();
     this.resetCssGlow();

@@ -1,126 +1,205 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { audioSystem } from '../services/audioService';
 
 /**
- * Cinematic TRON Opening Experience (8-Second Sequence)
+ * Cinematic TRON Opening Experience (~8-Second Sequence)
  * Inspired by TRON Legacy Intro:
- * 0–2s: Deep cinematic darkness
- * 2–5s: Electric gas tube flickering sequence for 'WELCOME SHUBRANIL'
- * 5–7s: Surrounding glowing vector circuits & circular identity disc powering up
- * ~8s: 100% Full illumination flash -> Soundtrack starts -> Smooth transition to main portfolio
- * Fallback: If browser blocks autoplay, presents sleek '[ INITIALIZE SYSTEM ]' button.
+ * 0–2.0s: Deep cinematic darkness, subtle ambient glow, system offline telemetry.
+ * 2.0–5.0s: Electric neon tube flickering & voltage instability for 'WELCOME SHUBRANIL'.
+ * 5.0–7.6s: Surrounding vector circuits & circular identity disc powering up, subtitle telemetry.
+ * 7.6–8.0s: 100% Full illumination flash -> Soundtrack playback initiated in background.
+ * ~8.0s: Automatic smooth transition to main portfolio.
+ *
+ * Resilience features:
+ * - Audio playback is strictly NON-BLOCKING (never prevents entrance).
+ * - Safety watchdog timer guarantees transition even if rAF is paused or tab is backgrounded.
+ * - Empty dependency array on main loop prevents reset/restart loops.
+ * - One-click [ SKIP INTRO ] button and keyboard support (Esc/Enter/Space).
+ * - Respects prefers-reduced-motion.
  */
 export default function CinematicWelcome({ onComplete }) {
-  const [phaseTime, setPhaseTime] = useState(0); // 0 to 8.5s
-  const [flickerOpacity, setFlickerOpacity] = useState(0);
-  const [glowSize, setGlowSize] = useState(0);
-  const [circuitPower, setCircuitPower] = useState(0); // 0 to 1
-  const [isFullyOn, setIsFullyOn] = useState(false);
-  const [requireClickToEnter, setRequireClickToEnter] = useState(false);
+  const [animState, setAnimState] = useState({
+    phaseTime: 0,
+    flickerOpacity: 0,
+    glowSize: 0,
+    circuitPower: 0,
+    statusText: '● SYSTEM OFFLINE // COLD BOOT',
+  });
   const [isFadingOut, setIsFadingOut] = useState(false);
 
-  const startTimeRef = useRef(null);
-  const animFrameRef = useRef(null);
-
+  const onCompleteRef = useRef(onComplete);
   useEffect(() => {
-    startTimeRef.current = performance.now();
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  const hasTransitionedRef = useRef(false);
+  const animFrameRef = useRef(null);
+  const safetyTimeoutRef = useRef(null);
+  const fadeTimeoutRef = useRef(null);
+
+  // Transition to main portfolio
+  const triggerTransition = useCallback(() => {
+    if (hasTransitionedRef.current) return;
+    hasTransitionedRef.current = true;
+
+    // Attempt non-blocking audio play in background
+    audioSystem.play().catch((err) => {
+      console.debug('Autoplay deferred to explicit user interaction:', err);
+    });
+
+    setIsFadingOut(true);
+
+    fadeTimeoutRef.current = setTimeout(() => {
+      if (onCompleteRef.current) {
+        onCompleteRef.current();
+      }
+    }, 850);
+  }, []);
+
+  // Keyboard shortcut listener (Esc / Space / Enter to skip intro)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        triggerTransition();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [triggerTransition]);
+
+  // Reduced motion preference check
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (prefersReduced) {
+        console.info('Reduced motion preference detected. Transitioning intro immediately.');
+        triggerTransition();
+      }
+    }
+  }, [triggerTransition]);
+
+  // Watchdog timer: hard cap at 9.2s ensures transition even if rAF stops
+  useEffect(() => {
+    safetyTimeoutRef.current = setTimeout(() => {
+      if (!hasTransitionedRef.current) {
+        console.warn('Welcome screen safety watchdog triggered.');
+        triggerTransition();
+      }
+    }, 9200);
+
+    return () => {
+      if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+      if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
+    };
+  }, [triggerTransition]);
+
+  // Main 8-second animation loop
+  useEffect(() => {
+    const startTime = performance.now();
 
     const updateLoop = (now) => {
-      const elapsed = (now - startTimeRef.current) / 1000;
-      setPhaseTime(elapsed);
+      if (hasTransitionedRef.current) return;
+
+      const elapsed = (now - startTime) / 1000;
+
+      // Completion point: transition to portfolio after 8.0s
+      if (elapsed >= 8.0) {
+        setAnimState({
+          phaseTime: 8.0,
+          flickerOpacity: 1.0,
+          glowSize: 50,
+          circuitPower: 1.0,
+          statusText: '● GRID POWER: 100%',
+        });
+        triggerTransition();
+        return;
+      }
 
       // Phase 1: 0 - 2.0s (Deep darkness)
       if (elapsed < 2.0) {
-        setFlickerOpacity(0);
-        setGlowSize(0);
-        setCircuitPower(0);
+        setAnimState({
+          phaseTime: elapsed,
+          flickerOpacity: 0,
+          glowSize: 0,
+          circuitPower: 0,
+          statusText: '● SYSTEM OFFLINE // COLD BOOT',
+        });
       }
       // Phase 2: 2.0 - 5.0s (Electric neon tube flicker & voltage instability)
       else if (elapsed < 5.0) {
-        const t = elapsed - 2.0; // 0 to 3s
+        const t = elapsed - 2.0; // 0 to 3.0s
         let opacity = 0;
         let glow = 0;
 
         if (t < 0.25) {
-          // Dark
           opacity = 0;
         } else if (t < 0.35) {
-          // Quick first arc flash
           opacity = 0.45;
           glow = 8;
         } else if (t < 0.5) {
-          // Drops out (darkness)
           opacity = 0.05;
           glow = 2;
         } else if (t < 0.65) {
-          // Sharp double flicker
           opacity = 0.6;
           glow = 12;
         } else if (t < 0.8) {
-          // Drops to 20%
           opacity = 0.2;
           glow = 4;
         } else if (t < 1.1) {
-          // Dies out completely for 300ms
           opacity = 0;
           glow = 0;
         } else if (t < 1.35) {
-          // Micro sputter jitter
           opacity = Math.random() > 0.4 ? 0.55 : 0.1;
           glow = 10;
         } else if (t < 1.7) {
-          // Voltage stabilizing around 40% with micro hum
           opacity = 0.4 + Math.sin(t * 30) * 0.08;
           glow = 14;
         } else if (t < 1.85) {
-          // Sudden voltage flicker drop
           opacity = 0.15;
           glow = 3;
         } else if (t < 2.3) {
-          // Voltage surge up to 75%
           opacity = 0.75 + Math.sin(t * 25) * 0.05;
           glow = 20;
         } else {
-          // Gradually stabilizes toward full power
           opacity = 0.85;
           glow = 25;
         }
 
-        setFlickerOpacity(opacity);
-        setGlowSize(glow);
-        setCircuitPower(Math.max(0, (t - 1.5) / 1.5) * 0.4);
+        setAnimState({
+          phaseTime: elapsed,
+          flickerOpacity: opacity,
+          glowSize: glow,
+          circuitPower: Math.max(0, (t - 1.5) / 1.5) * 0.4,
+          statusText: '● HIGH-VOLTAGE TUBE ARCS FIRING',
+        });
       }
-      // Phase 3: 5.0 - 7.5s (Powering up circuits & glowing identity disc)
+      // Phase 3: 5.0 - 7.6s (Powering up circuits & glowing identity disc)
       else if (elapsed < 7.6) {
-        const t = elapsed - 5.0; // 0 to 2.5s
-        const powerProgress = t / 2.5;
-
-        // Subtle electric hum modulation
+        const t = elapsed - 5.0; // 0 to 2.6s
+        const powerProgress = t / 2.6;
         const hum = Math.sin(elapsed * 20) * 0.03;
-        setFlickerOpacity(0.85 + powerProgress * 0.15 + hum);
-        setGlowSize(25 + powerProgress * 20);
-        setCircuitPower(0.4 + powerProgress * 0.6);
-      }
-      // Phase 4: Around 8.0s (100% Max Illumination + Soundtrack Start)
-      else if (!isFullyOn) {
-        setIsFullyOn(true);
-        setFlickerOpacity(1.0);
-        setGlowSize(50);
-        setCircuitPower(1.0);
 
-        // Attempt automated soundtrack playback at exact moment of full power
-        audioSystem.play().then((success) => {
-          if (success) {
-            // Autoplay succeeded! Transition smoothly to portfolio
-            triggerSmoothTransition();
-          } else {
-            // Browser blocked autoplay: show minimal prompt
-            setRequireClickToEnter(true);
-          }
+        setAnimState({
+          phaseTime: elapsed,
+          flickerOpacity: Math.min(1.0, 0.85 + powerProgress * 0.15 + hum),
+          glowSize: 25 + powerProgress * 20,
+          circuitPower: 0.4 + powerProgress * 0.6,
+          statusText: '● LIGHT CYCLES SYNCHRONIZING',
+        });
+      }
+      // Phase 4: 7.6 - 8.0s (Full power stabilization)
+      else {
+        setAnimState({
+          phaseTime: elapsed,
+          flickerOpacity: 1.0,
+          glowSize: 50,
+          circuitPower: 1.0,
+          statusText: '● GRID POWER: 100%',
         });
       }
 
-      if (elapsed < 8.2 || !isFullyOn) {
+      if (!hasTransitionedRef.current) {
         animFrameRef.current = requestAnimationFrame(updateLoop);
       }
     };
@@ -132,30 +211,17 @@ export default function CinematicWelcome({ onComplete }) {
         cancelAnimationFrame(animFrameRef.current);
       }
     };
-  }, [isFullyOn]);
+  }, [triggerTransition]);
 
-  const triggerSmoothTransition = () => {
-    setIsFadingOut(true);
-    setTimeout(() => {
-      onComplete();
-    }, 900);
-  };
-
-  const handleManualEnter = async () => {
-    await audioSystem.play();
-    triggerSmoothTransition();
-  };
-
-  const handleSkip = () => {
-    audioSystem.play();
-    triggerSmoothTransition();
-  };
+  const { phaseTime, flickerOpacity, glowSize, circuitPower, statusText } = animState;
 
   return (
     <div
       className={`fixed inset-0 z-70 bg-black flex flex-col items-center justify-center select-none overflow-hidden transition-opacity duration-1000 ${
         isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
+      role="dialog"
+      aria-label="Welcome Introduction"
     >
       {/* Background Deep Space Radial Fog */}
       <div
@@ -169,8 +235,8 @@ export default function CinematicWelcome({ onComplete }) {
 
       {/* Skip Button (Top Right) */}
       <button
-        onClick={handleSkip}
-        className="absolute top-6 right-6 font-mono text-[11px] tracking-widest text-slate-500 hover:text-tron-cyan px-3 py-1.5 rounded border border-transparent hover:border-tron-cyan/40 transition-colors z-20"
+        onClick={triggerTransition}
+        className="absolute top-6 right-6 font-mono text-[11px] tracking-widest text-slate-500 hover:text-tron-cyan px-3 py-1.5 rounded border border-transparent hover:border-tron-cyan/40 transition-colors z-20 cursor-pointer"
         aria-label="Skip Introduction"
       >
         [ SKIP INTRO ]
@@ -227,7 +293,7 @@ export default function CinematicWelcome({ onComplete }) {
             WELCOME SHUBRANIL
           </div>
 
-          {/* Subtitle Telemetry (Appears during 5-7s) */}
+          {/* Subtitle Telemetry (Appears during 5-7.6s) */}
           <div
             className="font-mono text-[10px] sm:text-xs md:text-sm tracking-[0.2em] text-tron-cyan/80 mt-4 uppercase transition-opacity duration-700"
             style={{
@@ -239,31 +305,14 @@ export default function CinematicWelcome({ onComplete }) {
         </div>
       </div>
 
-      {/* Bottom Status / Cinematic Action Prompt */}
+      {/* Bottom Status Telemetry */}
       <div className="absolute bottom-12 text-center z-20">
-        {requireClickToEnter ? (
-          <div className="animate-fade-in flex flex-col items-center gap-3">
-            <button
-              onClick={handleManualEnter}
-              className="px-6 py-3 rounded bg-tron-cyan/15 border border-tron-cyan text-tron-cyan hover:bg-tron-cyan hover:text-black font-display font-bold text-xs sm:text-sm tracking-[0.25em] uppercase transition-all shadow-[0_0_25px_rgba(0,240,255,0.4)] hover:shadow-[0_0_35px_rgba(0,240,255,0.8)]"
-            >
-              [ INITIALIZE SYSTEM ]
-            </button>
-            <span className="font-mono text-[10px] tracking-widest text-slate-500">
-              CLICK TO ESTABLISH AUDIO LINK & ENTER
-            </span>
-          </div>
-        ) : (
-          <div
-            className="font-mono text-[10px] sm:text-[11px] tracking-widest text-slate-500 uppercase transition-opacity duration-500"
-            style={{ opacity: phaseTime < 1.8 ? 0.35 : circuitPower * 0.8 }}
-          >
-            {phaseTime < 2.0 && "● SYSTEM OFFLINE // COLD BOOT"}
-            {phaseTime >= 2.0 && phaseTime < 5.0 && "● HIGH-VOLTAGE TUBE ARCS FIRING"}
-            {phaseTime >= 5.0 && phaseTime < 7.6 && "● LIGHT CYCLES SYNCHRONIZING"}
-            {phaseTime >= 7.6 && "● GRID POWER: 100%"}
-          </div>
-        )}
+        <div
+          className="font-mono text-[10px] sm:text-[11px] tracking-widest text-slate-500 uppercase transition-opacity duration-500"
+          style={{ opacity: phaseTime < 1.8 ? 0.35 : circuitPower * 0.8 }}
+        >
+          {statusText}
+        </div>
       </div>
     </div>
   );

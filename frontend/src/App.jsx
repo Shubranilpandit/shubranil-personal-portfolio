@@ -28,6 +28,21 @@ import Footer from './components/Footer';
 export default function App() {
   const [welcomeComplete, setWelcomeComplete] = useState(false);
 
+  // Global safety watchdog: guarantees welcome screen cannot block the portfolio indefinitely
+  React.useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      setWelcomeComplete((done) => {
+        if (!done) {
+          console.warn('App safety watchdog: Auto-transitioning to main portfolio.');
+          return true;
+        }
+        return done;
+      });
+    }, 11000);
+
+    return () => clearTimeout(fallbackTimer);
+  }, []);
+
   return (
     <div className="relative min-h-screen bg-tron-void text-tron-text overflow-x-hidden selection:bg-tron-cyan selection:text-black">
       
