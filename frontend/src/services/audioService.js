@@ -138,11 +138,16 @@ class AudioService {
 
   async play() {
     this.init();
+    this.lastPlayStartTime = Date.now();
 
     if (!this.audio) {
       this.errorMessage = "Audio system unavailable.";
       this.notify();
       return false;
+    }
+
+    if (this.audio.error) {
+      this.audio.load();
     }
 
     // If already actively playing, return immediately
@@ -181,7 +186,7 @@ class AudioService {
         this.notify();
         return true;
       } catch (err) {
-        console.warn("Audio playback attempt failed:", err);
+        console.warn("Audio playback attempt failed:", err ? `${err.name}: ${err.message}` : err);
         this.isPlaying = false;
         this.stopBeatLoop();
 
@@ -228,6 +233,11 @@ class AudioService {
 
   toggle() {
     this.init();
+    // Guard against double inversion if pointerdown and click fire in the same user gesture
+    if (this.lastPlayStartTime && (Date.now() - this.lastPlayStartTime < 500)) {
+      return this.activePlayPromise || Promise.resolve(true);
+    }
+
     if (this.isPlaying || (this.audio && !this.audio.paused)) {
       this.pause();
       return Promise.resolve(false);
@@ -392,3 +402,7 @@ class AudioService {
 }
 
 export const audioSystem = new AudioService();
+
+if (typeof window !== 'undefined') {
+  window.audioSystem = audioSystem;
+}

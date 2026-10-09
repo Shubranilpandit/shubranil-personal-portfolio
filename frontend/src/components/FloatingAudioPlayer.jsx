@@ -60,6 +60,7 @@ export default function FloatingAudioPlayer() {
   return (
     <div
       ref={playerRef}
+      onPointerDown={(e) => e.stopPropagation()}
       className="fixed bottom-6 right-6 z-30 select-none flex flex-col-reverse sm:flex-row items-end sm:items-center gap-2 sm:gap-3"
       role="region"
       aria-label="TRON Audio Player"
